@@ -15,7 +15,7 @@ fun ConfirmDeleteDialog(
     title: String,
     message: String,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,

@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,17 +37,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.time_controll.data.model.AlarmFolder
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FolderEditDialog(
     folder: AlarmFolder,
     isNew: Boolean,
     onDismiss: () -> Unit,
-    onSave: (name: String, colorHex: Long) -> Unit
+    onSave: (name: String, colorHex: Long) -> Unit,
 ) {
     var name by remember { mutableStateOf(folder.name) }
-    var selectedColor by remember { mutableStateOf(folder.colorHex) }
-    var showError by remember { mutableStateOf(false) }
+    var selectedColor by remember { mutableLongStateOf(folder.colorHex) }
+    var showError by remember { mutableStateOf(value = false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,

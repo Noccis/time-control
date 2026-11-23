@@ -2,6 +2,7 @@ package com.example.time_controll.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import com.example.time_controll.alarm.AlarmScheduler
 import com.example.time_controll.data.model.AlarmFolder
 import com.example.time_controll.data.model.AlarmItem
@@ -9,11 +10,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
-import org.json.JSONObject
 
-class AlarmRepository private constructor(private val context: Context) {
+class AlarmRepository private constructor(context: Context) {
+    private val appContext: Context = context.applicationContext
     private val prefs: SharedPreferences =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _alarms = MutableStateFlow<List<AlarmItem>>(emptyList())
     val alarms: StateFlow<List<AlarmItem>> = _alarms.asStateFlow()
@@ -43,8 +44,8 @@ class AlarmRepository private constructor(private val context: Context) {
                 listOf(
                     AlarmFolder(name = "Morning", colorHex = 0xFFFF9800), // Orange
                     AlarmFolder(name = "Work", colorHex = 0xFF2196F3),    // Blue
-                    AlarmFolder(name = "Fitness", colorHex = 0xFF4CAF50)  // Green
-                )
+                    AlarmFolder(name = "Fitness", colorHex = 0xFF4CAF50), // Green
+                ),
             )
             saveFoldersInternal(loadedFolders)
         }
@@ -73,8 +74,8 @@ class AlarmRepository private constructor(private val context: Context) {
                     isEnabled = false,
                     isRepeating = true,
                     repeatDays = setOf(1, 2, 3, 4, 5), // Weekdays
-                    folderId = firstFolderId
-                )
+                    folderId = firstFolderId,
+                ),
             )
             saveAlarmsInternal(loadedAlarms)
         }
@@ -84,13 +85,13 @@ class AlarmRepository private constructor(private val context: Context) {
     private fun saveAlarmsInternal(list: List<AlarmItem>) {
         val array = JSONArray()
         list.forEach { array.put(it.toJson()) }
-        prefs.edit().putString(KEY_ALARMS, array.toString()).apply()
+        prefs.edit { putString(KEY_ALARMS, array.toString()) }
     }
 
     private fun saveFoldersInternal(list: List<AlarmFolder>) {
         val array = JSONArray()
         list.forEach { array.put(it.toJson()) }
-        prefs.edit().putString(KEY_FOLDERS, array.toString()).apply()
+        prefs.edit { putString(KEY_FOLDERS, array.toString()) }
     }
 
     fun addAlarm(alarm: AlarmItem) {
@@ -98,7 +99,7 @@ class AlarmRepository private constructor(private val context: Context) {
         _alarms.value = updated
         saveAlarmsInternal(updated)
         if (alarm.isEnabled) {
-            AlarmScheduler.schedule(context, alarm)
+            AlarmScheduler.schedule(appContext, alarm)
         }
     }
 
@@ -109,14 +110,14 @@ class AlarmRepository private constructor(private val context: Context) {
         _alarms.value = updated
         saveAlarmsInternal(updated)
         if (alarm.isEnabled) {
-            AlarmScheduler.schedule(context, alarm)
+            AlarmScheduler.schedule(appContext, alarm)
         } else {
-            AlarmScheduler.cancel(context, alarm.id)
+            AlarmScheduler.cancel(appContext, alarm.id)
         }
     }
 
     fun deleteAlarm(alarmId: Long) {
-        AlarmScheduler.cancel(context, alarmId)
+        AlarmScheduler.cancel(appContext, alarmId)
         val updated = _alarms.value.filter { it.id != alarmId }
         _alarms.value = updated
         saveAlarmsInternal(updated)
@@ -168,7 +169,7 @@ class AlarmRepository private constructor(private val context: Context) {
 
     fun rescheduleAllAlarms() {
         _alarms.value.filter { it.isEnabled }.forEach {
-            AlarmScheduler.schedule(context, it)
+            AlarmScheduler.schedule(appContext, it)
         }
     }
 

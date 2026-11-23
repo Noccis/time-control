@@ -16,7 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,9 +45,12 @@ fun AlarmCard(
     onToggle: (Boolean) -> Unit,
     onClick: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
     showFolderBadge: Boolean = true,
-    modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val is24Hour = android.text.format.DateFormat.is24HourFormat(context)
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -59,9 +62,9 @@ fun AlarmCard(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
             } else {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-            }
+            },
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (alarm.isEnabled) 3.dp else 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (alarm.isEnabled) 3.dp else 1.dp),
     ) {
         Column(
             modifier = Modifier
@@ -73,12 +76,12 @@ fun AlarmCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Time & AM/PM
+                // Time & AM/PM (hidden if 24-hour format)
                 Row(
                     verticalAlignment = Alignment.Bottom
                 ) {
                     Text(
-                        text = alarm.formattedTime(use24Hour = false),
+                        text = alarm.formattedTime(use24Hour = is24Hour),
                         fontSize = 38.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (alarm.isEnabled) {
@@ -87,18 +90,20 @@ fun AlarmCard(
                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                         }
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = alarm.amPmMarker(),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (alarm.isEnabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                        },
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
+                    if (!is24Hour) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = alarm.amPmMarker(),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (alarm.isEnabled) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            },
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                    }
                 }
 
                 // Switch
@@ -161,13 +166,34 @@ fun AlarmCard(
                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                         }
                     )
+
+                    if (!alarm.soundTitle.isNullOrBlank()) {
+                        Text(
+                            text = " • ",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            modifier = Modifier.size(13.dp),
+                            tint = if (alarm.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = alarm.soundTitle,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            color = if (alarm.isEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        )
+                    }
                 }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Folder badge
-                    if (showFolderBadge && folder != null) {
+                    if (showFolderBadge && (folder != null)) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = Color(folder.colorHex).copy(alpha = if (alarm.isEnabled) 0.2f else 0.1f)

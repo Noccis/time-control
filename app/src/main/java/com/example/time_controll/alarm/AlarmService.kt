@@ -5,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
@@ -18,6 +17,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.net.toUri
 import com.example.time_controll.R
 import com.example.time_controll.data.AlarmRepository
 import com.example.time_controll.ui.AlarmAlertActivity
@@ -60,7 +60,7 @@ class AlarmService : Service() {
         val alarm = repository.getAlarm(alarmId)
         val folder = repository.getFolder(alarm?.folderId)
 
-        val alarmTitle = if (!alarm?.name.isNullOrBlank()) alarm?.name ?: "Alarm" else "Alarm"
+        val alarmTitle = alarm?.name?.takeIf { it.isNotBlank() } ?: "Alarm"
         val folderSubtitle = if (folder != null) "Folder: ${folder.name}" else "Time to wake up!"
 
         // Start Foreground Notification
@@ -69,12 +69,22 @@ class AlarmService : Service() {
 
         // Play Sound
         try {
-            var alertUri: Uri? = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            if (alertUri == null) {
-                alertUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            var alertUri: Uri? = null
+            if (!alarm?.soundUri.isNullOrBlank()) {
+                try {
+                    val parsed = alarm.soundUri.toUri()
+                    contentResolver.openInputStream(parsed)?.close()
+                    alertUri = parsed
+                } catch (e: Exception) {
+                    Log.w(TAG, "Custom sound URI not accessible, falling back: ${e.message}")
+                    alertUri = null
+                }
             }
+
             if (alertUri == null) {
-                alertUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                alertUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             }
 
             mediaPlayer?.release()
@@ -84,7 +94,7 @@ class AlarmService : Service() {
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
+                        .build(),
                 )
                 isLooping = true
                 prepare()
@@ -103,20 +113,15 @@ class AlarmService : Service() {
     private fun startVibration() {
         try {
             vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                val vibratorManager = getSystemService(VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 vibratorManager?.defaultVibrator
             } else {
                 @Suppress("DEPRECATION")
-                getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                getSystemService(VIBRATOR_SERVICE) as? Vibrator
             }
 
             val pattern = longArrayOf(0, 500, 500, 500, 500)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator?.vibrate(pattern, 0)
-            }
+            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
         } catch (e: Exception) {
             Log.e(TAG, "Error vibrating: ${e.message}")
         }
@@ -148,7 +153,7 @@ class AlarmService : Service() {
             this,
             alarmId.toInt(),
             fullScreenIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         val dismissIntent = Intent(this, AlarmReceiver::class.java).apply {
@@ -159,7 +164,7 @@ class AlarmService : Service() {
             this,
             (alarmId + 1000).toInt(),
             dismissIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         val snoozeIntent = Intent(this, AlarmReceiver::class.java).apply {
@@ -170,7 +175,7 @@ class AlarmService : Service() {
             this,
             (alarmId + 2000).toInt(),
             snoozeIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -190,20 +195,18 @@ class AlarmService : Service() {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Alarm Alerts",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Channel for active alarm notifications"
-                setBypassDnd(true)
-                enableVibration(true)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Alarm Alerts",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = "Channel for active alarm notifications"
+            setBypassDnd(true)
+            enableVibration(true)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
     }
 
     override fun onDestroy() {

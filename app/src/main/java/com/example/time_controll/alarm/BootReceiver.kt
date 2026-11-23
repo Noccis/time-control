@@ -8,11 +8,15 @@ import com.example.time_controll.data.AlarmRepository
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
-            intent.action == "android.intent.action.QUICKBOOT_POWERON"
-        ) {
-            Log.d(TAG, "Boot completed, rescheduling all alarms...")
-            AlarmRepository.getInstance(context).rescheduleAllAlarms()
+        when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED,
+            "android.intent.action.QUICKBOOT_POWERON",
+            Intent.ACTION_TIMEZONE_CHANGED,
+            Intent.ACTION_TIME_CHANGED,
+            -> {
+                Log.d(TAG, "System time/zone event (${intent.action}), rescheduling all alarms...")
+                AlarmRepository.getInstance(context).rescheduleAllAlarms()
+            }
         }
     }
 

@@ -7,7 +7,7 @@ data class AlarmFolder(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
     val colorHex: Long = 0xFF3F51B5, // Default Indigo
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
 ) {
     fun toJson(): JSONObject {
         return JSONObject().apply {

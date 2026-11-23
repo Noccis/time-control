@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
@@ -51,14 +50,15 @@ fun FolderCard(
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(value = false) }
 
     val folderAlarms = alarms.filter { it.folderId == folder.id }
     val totalCount = folderAlarms.size
     val activeCount = folderAlarms.count { it.isEnabled }
     val nextActiveAlarm = folderAlarms
+        .asSequence()
         .filter { it.isEnabled }
         .minByOrNull { it.calculateNextTriggerMillis() }
 
@@ -183,9 +183,19 @@ fun FolderCard(
                         tint = if (nextActiveAlarm != null) Color(folder.colorHex) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val is24Hour = android.text.format.DateFormat.is24HourFormat(context)
+                    val nextTimeStr = if (nextActiveAlarm != null) {
+                        if (is24Hour) {
+                            nextActiveAlarm.formattedTime(use24Hour = true)
+                        } else {
+                            "${nextActiveAlarm.formattedTime(use24Hour = false)} ${nextActiveAlarm.amPmMarker()}"
+                        }
+                    } else ""
+
                     Text(
                         text = if (nextActiveAlarm != null) {
-                            "Next: ${nextActiveAlarm.formattedTime(false)} ${nextActiveAlarm.amPmMarker()}${if (nextActiveAlarm.name.isNotBlank()) " (${nextActiveAlarm.name})" else ""}"
+                            "Next: $nextTimeStr${if (nextActiveAlarm.name.isNotBlank()) " (${nextActiveAlarm.name})" else ""}"
                         } else {
                             "No active alarms in this folder"
                         },

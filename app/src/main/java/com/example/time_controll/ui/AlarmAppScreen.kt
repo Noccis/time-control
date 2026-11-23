@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -82,10 +81,9 @@ import com.example.time_controll.ui.components.ConfirmDeleteDialog
 import com.example.time_controll.ui.components.FolderCard
 import com.example.time_controll.ui.components.FolderEditDialog
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlarmAppScreen(
-    viewModel: AlarmViewModel = viewModel()
+    viewModel: AlarmViewModel = viewModel(),
 ) {
     val context = LocalContext.current
     val alarms by viewModel.alarms.collectAsState()
@@ -103,8 +101,7 @@ fun AlarmAppScreen(
     // Android 13+ Notification permission
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
-        onResult = { /* Handled */ }
-    )
+    ) { /* Handled */ }
 
     var hasExactAlarmPermission by remember {
         mutableStateOf(AlarmScheduler.canScheduleExactAlarms(context))
@@ -278,9 +275,15 @@ fun AlarmAppScreen(
 
     // Delete Alarm Confirmation Dialog
     alarmToDelete?.let { alarm ->
+        val is24Hour = android.text.format.DateFormat.is24HourFormat(context)
+        val timeLabel = if (is24Hour) {
+            alarm.formattedTime(use24Hour = true)
+        } else {
+            "${alarm.formattedTime(use24Hour = false)} ${alarm.amPmMarker()}"
+        }
         ConfirmDeleteDialog(
             title = "Delete Alarm",
-            message = "Are you sure you want to delete this alarm (${alarm.formattedTime()} ${alarm.amPmMarker()})?",
+            message = "Are you sure you want to delete this alarm ($timeLabel)?",
             onConfirm = { viewModel.confirmDeleteAlarm() },
             onDismiss = { viewModel.cancelDeleteAlarm() }
         )
@@ -351,8 +354,8 @@ private fun AlarmTopBar(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
                 )
             )
         }
@@ -373,8 +376,8 @@ private fun AlarmTopBar(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
                 )
             )
         }

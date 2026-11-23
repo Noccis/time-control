@@ -1,12 +1,22 @@
 package com.example.time_controll.ui.components
 
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.RingtoneManager
+import android.net.Uri
+import android.os.Build
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,11 +31,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -35,6 +48,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -45,6 +59,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,14 +68,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import com.example.time_controll.data.model.AlarmFolder
 import com.example.time_controll.data.model.AlarmItem
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlarmEditDialog(
     alarm: AlarmItem,
@@ -69,19 +86,133 @@ fun AlarmEditDialog(
     onDismiss: () -> Unit,
     onSave: (AlarmItem) -> Unit,
     onDelete: (() -> Unit)? = null,
-    onCreateFolderClick: () -> Unit
+    onCreateFolderClick: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val is24Hour = android.text.format.DateFormat.is24HourFormat(context)
+
     var name by remember { mutableStateOf(alarm.name) }
     var selectedFolderId by remember { mutableStateOf(alarm.folderId) }
     var isRepeating by remember { mutableStateOf(alarm.isRepeating) }
     var repeatDays by remember { mutableStateOf(alarm.repeatDays) }
     var vibrate by remember { mutableStateOf(alarm.vibrate) }
-    var showTimeInputMode by remember { mutableStateOf(false) }
+    var soundUri by remember { mutableStateOf(alarm.soundUri) }
+    var soundTitle by remember { mutableStateOf(alarm.soundTitle) }
+    var showTimeInputMode by remember { mutableStateOf(value = false) }
+
+    // Security rationale dialog state
+    var showPermissionRationaleDialog by remember { mutableStateOf(value = false) }
+
+    // Media preview state
+    var isPlayingPreview by remember { mutableStateOf(value = false) }
+    var previewPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            previewPlayer?.stop()
+            previewPlayer?.release()
+            previewPlayer = null
+        }
+    }
+
+    fun stopAudioPreview() {
+        if (isPlayingPreview) {
+            previewPlayer?.stop()
+            previewPlayer?.release()
+            previewPlayer = null
+            isPlayingPreview = false
+        }
+    }
+
+    fun toggleAudioPreview() {
+        if (isPlayingPreview) {
+            stopAudioPreview()
+        } else {
+            try {
+                previewPlayer?.release()
+                val uriToPlay = if (!soundUri.isNullOrBlank()) {
+                    Uri.parse(soundUri)
+                } else {
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                }
+
+                previewPlayer = MediaPlayer().apply {
+                    setDataSource(context, uriToPlay)
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build()
+                    )
+                    setOnCompletionListener {
+                        isPlayingPreview = false
+                    }
+                    prepare()
+                    start()
+                }
+                isPlayingPreview = true
+            } catch (e: Exception) {
+                e.printStackTrace()
+                isPlayingPreview = false
+            }
+        }
+    }
+
+    // Storage / Document picker launcher
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                // Security requirement: Take persistable permission so background service/reboot can read the file
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: SecurityException) {
+                e.printStackTrace()
+            }
+            soundUri = uri.toString()
+            soundTitle = getDisplayNameFromUri(context, uri)
+            stopAudioPreview()
+        }
+    }
+
+    // Permission launcher for storage/media
+    val requiredPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_AUDIO
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+
+    val requestPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            openDocumentLauncher.launch(arrayOf("audio/*", "application/ogg"))
+        }
+    }
+
+    fun onBrowseAudioClicked() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            requiredPermission
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            openDocumentLauncher.launch(arrayOf("audio/*", "application/ogg"))
+        } else {
+            // Show rationale/security question before requesting permission
+            showPermissionRationaleDialog = true
+        }
+    }
 
     val timePickerState = rememberTimePickerState(
         initialHour = alarm.hour,
         initialMinute = alarm.minute,
-        is24Hour = false
+        is24Hour = is24Hour
     )
 
     val weekdays = listOf(
@@ -95,7 +226,10 @@ fun AlarmEditDialog(
     )
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            stopAudioPreview()
+            onDismiss()
+        },
         properties = DialogProperties(usePlatformDefaultWidth = false),
         modifier = Modifier
             .fillMaxWidth(0.95f)
@@ -331,7 +465,95 @@ fun AlarmEditDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Custom Sound / Music Section
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Alarm Sound",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            // Play / Preview button
+                            IconButton(
+                                onClick = { toggleAudioPreview() },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isPlayingPreview) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                    contentDescription = if (isPlayingPreview) "Stop Preview" else "Play Preview",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Current sound label
+                        Text(
+                            text = soundTitle ?: "Default Alarm Tone",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { onBrowseAudioClicked() },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FolderOpen,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Browse Files")
+                            }
+
+                            if (soundUri != null) {
+                                TextButton(
+                                    onClick = {
+                                        soundUri = null
+                                        soundTitle = null
+                                        stopAudioPreview()
+                                    }
+                                ) {
+                                    Text("Reset to Default")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Vibrate toggle
                 Row(
@@ -361,6 +583,7 @@ fun AlarmEditDialog(
         confirmButton = {
             Button(
                 onClick = {
+                    stopAudioPreview()
                     val updated = alarm.copy(
                         name = name.trim(),
                         hour = timePickerState.hour,
@@ -369,7 +592,9 @@ fun AlarmEditDialog(
                         isRepeating = isRepeating && repeatDays.isNotEmpty(),
                         repeatDays = if (isRepeating) repeatDays else emptySet(),
                         folderId = selectedFolderId,
-                        vibrate = vibrate
+                        vibrate = vibrate,
+                        soundUri = soundUri,
+                        soundTitle = soundTitle
                     )
                     onSave(updated)
                 },
@@ -380,22 +605,87 @@ fun AlarmEditDialog(
         },
         dismissButton = {
             Row {
-                if (!isNew && onDelete != null) {
+                if ((!isNew) && (onDelete != null)) {
                     TextButton(
-                        onClick = onDelete,
+                        onClick = {
+                            stopAudioPreview()
+                            onDelete()
+                        },
                         colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Delete")
                     }
                 }
-                TextButton(onClick = onDismiss) {
+                TextButton(
+                    onClick = {
+                        stopAudioPreview()
+                        onDismiss()
+                    },
+                ) {
                     Text("Cancel")
                 }
             }
-        }
+        },
     )
+
+    // Security & Rationale Dialog
+    if (showPermissionRationaleDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionRationaleDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Security,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text("Allow Audio File Access?")
+            },
+            text = {
+                Text(
+                    "Time Control needs permission to read audio files on your device so that you can select your own custom music or sound for this alarm.\n\n" +
+                    "Your privacy is protected: only the sound file you select will be used by the app to ring your alarm."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPermissionRationaleDialog = false
+                        requestPermissionLauncher.launch(requiredPermission)
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Grant Permission")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermissionRationaleDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+private fun getDisplayNameFromUri(context: Context, uri: Uri): String {
+    var displayName: String? = null
+    try {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (nameIndex != -1) {
+                    displayName = cursor.getString(nameIndex)
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return displayName ?: uri.lastPathSegment ?: "Custom Audio File"
 }

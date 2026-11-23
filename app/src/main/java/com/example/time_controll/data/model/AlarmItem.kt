@@ -15,7 +15,9 @@ data class AlarmItem(
     val isRepeating: Boolean = false,
     val repeatDays: Set<Int> = emptySet(), // 1 = Monday ... 7 = Sunday (DayOfWeek.value)
     val folderId: String? = null,
-    val vibrate: Boolean = true
+    val vibrate: Boolean = true,
+    val soundUri: String? = null,
+    val soundTitle: String? = null,
 ) {
     fun formattedTime(use24Hour: Boolean = false): String {
         return if (use24Hour) {
@@ -50,11 +52,13 @@ data class AlarmItem(
             4 to "Thu",
             5 to "Fri",
             6 to "Sat",
-            7 to "Sun"
+            7 to "Sun",
         )
         return dayNames
-            .filter { repeatDays.contains(it.first) }
-            .joinToString(", ") { it.second }
+            .asSequence()
+            .filter { (dayInt) -> repeatDays.contains(dayInt) }
+            .map { (_, label) -> label }
+            .joinToString(", ")
     }
 
     fun calculateNextTriggerMillis(): Long {
@@ -97,6 +101,16 @@ data class AlarmItem(
                 put("folderId", JSONObject.NULL)
             }
             put("vibrate", vibrate)
+            if (soundUri != null) {
+                put("soundUri", soundUri)
+            } else {
+                put("soundUri", JSONObject.NULL)
+            }
+            if (soundTitle != null) {
+                put("soundTitle", soundTitle)
+            } else {
+                put("soundTitle", JSONObject.NULL)
+            }
         }
     }
 
@@ -112,6 +126,12 @@ data class AlarmItem(
             val folderIdRaw = if (json.isNull("folderId")) null else json.optString("folderId", "")
             val resolvedFolderId = if (folderIdRaw.isNullOrEmpty()) null else folderIdRaw
 
+            val soundUriRaw = if (json.isNull("soundUri")) null else json.optString("soundUri", "")
+            val resolvedSoundUri = if (soundUriRaw.isNullOrEmpty()) null else soundUriRaw
+
+            val soundTitleRaw = if (json.isNull("soundTitle")) null else json.optString("soundTitle", "")
+            val resolvedSoundTitle = if (soundTitleRaw.isNullOrEmpty()) null else soundTitleRaw
+
             return AlarmItem(
                 id = json.optLong("id", System.currentTimeMillis()),
                 name = json.optString("name", ""),
@@ -121,7 +141,9 @@ data class AlarmItem(
                 isRepeating = json.optBoolean("isRepeating", false),
                 repeatDays = daysSet,
                 folderId = resolvedFolderId,
-                vibrate = json.optBoolean("vibrate", true)
+                vibrate = json.optBoolean("vibrate", true),
+                soundUri = resolvedSoundUri,
+                soundTitle = resolvedSoundTitle
             )
         }
     }

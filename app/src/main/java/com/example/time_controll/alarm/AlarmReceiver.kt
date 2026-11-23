@@ -3,7 +3,6 @@ package com.example.time_controll.alarm
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import com.example.time_controll.data.AlarmRepository
 
@@ -18,18 +17,14 @@ class AlarmReceiver : BroadcastReceiver() {
                 if (alarmId != -1L) {
                     val repository = AlarmRepository.getInstance(context)
                     val alarm = repository.getAlarm(alarmId)
-                    if (alarm != null && alarm.isEnabled) {
+                    if ((alarm != null) && alarm.isEnabled) {
                         // Start Alarm Service
                         val serviceIntent = Intent(context, AlarmService::class.java).apply {
                             this.action = AlarmService.ACTION_START_ALARM
                             putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
                         }
                         try {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                context.startForegroundService(serviceIntent)
-                            } else {
-                                context.startService(serviceIntent)
-                            }
+                            context.startForegroundService(serviceIntent)
                         } catch (e: Exception) {
                             Log.e(TAG, "Failed to start AlarmService: ${e.message}")
                         }
@@ -38,7 +33,7 @@ class AlarmReceiver : BroadcastReceiver() {
                         if (alarm.isRepeating && alarm.repeatDays.isNotEmpty()) {
                             AlarmScheduler.schedule(context, alarm)
                         } else {
-                            repository.toggleAlarm(alarmId, false)
+                            repository.toggleAlarm(alarmId, enabled = false)
                         }
                     }
                 }
@@ -55,7 +50,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 }
                 context.startService(serviceIntent)
                 if (alarmId != -1L) {
-                    AlarmScheduler.snooze(context, alarmId, 10)
+                    AlarmScheduler.snooze(context, alarmId, snoozeMinutes = 10)
                 }
             }
         }

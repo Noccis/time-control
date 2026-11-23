@@ -31,7 +31,7 @@ object AlarmScheduler {
             return
         }
 
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val alarmManager = (context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager) ?: return
         val triggerMillis = alarm.calculateNextTriggerMillis()
 
         val intent = Intent(context, AlarmReceiver::class.java).apply {
@@ -43,27 +43,27 @@ object AlarmScheduler {
             context,
             alarm.id.toInt(),
             intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         val showIntent = PendingIntent.getActivity(
             context,
             alarm.id.toInt(),
             Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            if ((Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) && !alarmManager.canScheduleExactAlarms()) {
                 alarmManager.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerMillis,
-                    pendingIntent
+                    pendingIntent,
                 )
             } else {
                 alarmManager.setAlarmClock(
                     AlarmManager.AlarmClockInfo(triggerMillis, showIntent),
-                    pendingIntent
+                    pendingIntent,
                 )
             }
             Log.d(TAG, "Scheduled alarm ${alarm.id} at $triggerMillis")
@@ -73,7 +73,7 @@ object AlarmScheduler {
                 alarmManager.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerMillis,
-                    pendingIntent
+                    pendingIntent,
                 )
             } catch (fallbackEx: Exception) {
                 Log.e(TAG, "Failed fallback alarm scheduling: ${fallbackEx.message}")
@@ -82,7 +82,7 @@ object AlarmScheduler {
     }
 
     fun snooze(context: Context, alarmId: Long, snoozeMinutes: Int = 10) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val alarmManager = (context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager) ?: return
         val triggerMillis = System.currentTimeMillis() + (snoozeMinutes * 60 * 1000L)
 
         val intent = Intent(context, AlarmReceiver::class.java).apply {
@@ -94,32 +94,32 @@ object AlarmScheduler {
             context,
             alarmId.toInt(),
             intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         val showIntent = PendingIntent.getActivity(
             context,
             alarmId.toInt(),
             Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         try {
             alarmManager.setAlarmClock(
                 AlarmManager.AlarmClockInfo(triggerMillis, showIntent),
-                pendingIntent
+                pendingIntent,
             )
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             alarmManager.setAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
                 triggerMillis,
-                pendingIntent
+                pendingIntent,
             )
         }
     }
 
     fun cancel(context: Context, alarmId: Long) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val alarmManager = (context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager) ?: return
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             action = ACTION_TRIGGER_ALARM
             putExtra(EXTRA_ALARM_ID, alarmId)
@@ -128,7 +128,7 @@ object AlarmScheduler {
             context,
             alarmId.toInt(),
             intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         alarmManager.cancel(pendingIntent)
         Log.d(TAG, "Cancelled alarm $alarmId")

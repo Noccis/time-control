@@ -2,22 +2,17 @@ package com.example.time_controll.ui
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
 import com.example.time_controll.data.AlarmRepository
 import com.example.time_controll.data.model.AlarmFolder
 import com.example.time_controll.data.model.AlarmItem
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 sealed class ScreenView {
-    object FoldersHub : ScreenView()
+    data object FoldersHub : ScreenView()
     data class FolderDetail(val folderId: String) : ScreenView()
-    object AllAlarms : ScreenView()
+    data object AllAlarms : ScreenView()
 }
 
 class AlarmViewModel(application: Application) : AndroidViewModel(application) {
@@ -32,13 +27,13 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
     // Alarm Editor State
     private val _editingAlarm = MutableStateFlow<AlarmItem?>(null)
     val editingAlarm: StateFlow<AlarmItem?> = _editingAlarm.asStateFlow()
-    private val _isNewAlarm = MutableStateFlow(false)
+    private val _isNewAlarm = MutableStateFlow(value = false)
     val isNewAlarm: StateFlow<Boolean> = _isNewAlarm.asStateFlow()
 
     // Folder Editor State
     private val _editingFolder = MutableStateFlow<AlarmFolder?>(null)
     val editingFolder: StateFlow<AlarmFolder?> = _editingFolder.asStateFlow()
-    private val _isCreatingFolder = MutableStateFlow(false)
+    private val _isCreatingFolder = MutableStateFlow(value = false)
     val isCreatingFolder: StateFlow<Boolean> = _isCreatingFolder.asStateFlow()
 
     // Confirm dialogs
@@ -66,7 +61,7 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
             isEnabled = true,
             isRepeating = false,
             repeatDays = setOf(1, 2, 3, 4, 5),
-            folderId = folderId
+            folderId = folderId,
         )
         _isNewAlarm.value = true
     }
@@ -98,8 +93,8 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun confirmDeleteAlarm() {
-        _alarmToDelete.value?.let {
-            repository.deleteAlarm(it.id)
+        _alarmToDelete.value?.let { alarm ->
+            repository.deleteAlarm(alarm.id)
         }
         _alarmToDelete.value = null
         if (_editingAlarm.value != null) {
@@ -115,7 +110,7 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
         _isCreatingFolder.value = true
         _editingFolder.value = AlarmFolder(
             name = "",
-            colorHex = AlarmFolder.PRESET_COLORS.random()
+            colorHex = AlarmFolder.PRESET_COLORS.random(),
         )
     }
 
@@ -131,7 +126,7 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
 
     fun saveFolder(name: String, colorHex: Long) {
         val current = _editingFolder.value
-        if (_isCreatingFolder.value || current == null) {
+        if (_isCreatingFolder.value || (current == null)) {
             repository.addFolder(name = name, colorHex = colorHex)
         } else {
             repository.updateFolder(current.copy(name = name, colorHex = colorHex))
@@ -146,8 +141,8 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
     fun confirmDeleteFolder() {
         _folderToDelete.value?.let { folder ->
             repository.deleteFolder(folder.id)
-            if (_currentView.value is ScreenView.FolderDetail &&
-                (_currentView.value as ScreenView.FolderDetail).folderId == folder.id
+            if ((_currentView.value is ScreenView.FolderDetail) &&
+                ((_currentView.value as ScreenView.FolderDetail).folderId == folder.id)
             ) {
                 _currentView.value = ScreenView.FoldersHub
             }
