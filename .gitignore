@@ -1,0 +1,65 @@
+# Built application files and packages
+*.apk
+*.aar
+*.ap_
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated build directories
+build/
+**/build/
+buildOutput/
+
+# Gradle files and caches
+.gradle/
+
+# Kotlin compiler cache (Kotlin 2.x+)
+.kotlin/
+
+# Local configuration file (contains SDK path specific to this machine)
+local.properties
+
+# Log files and profiler / memory dumps
+*.log
+*.hprof
+
+# Android Studio captures and navigation
+captures/
+**/captures/
+.navigation/
+
+# IntelliJ IDEA / Android Studio project files
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Keystore and signing files (keep signing keys private)
+*.jks
+*.keystore
+
+# External native build folders
+.externalNativeBuild/
+.cxx/
+
+# Google Services configuration (uncomment if Firebase is added with private keys)
+# google-services.json
+
+# OS-specific files
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
